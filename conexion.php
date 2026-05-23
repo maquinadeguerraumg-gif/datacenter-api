@@ -1,10 +1,8 @@
 <?php
 
 header("Content-Type: application/json");
-
-/* ============================================
-   CONEXION RAILWAY MYSQL
-============================================ */
+error_reporting(E_ALL);
+ini_set('display_errors', 1);
 
 $conn = new mysqli(
     "kodama.proxy.rlwy.net",
@@ -14,52 +12,64 @@ $conn = new mysqli(
     58999
 );
 
-if($conn->connect_error){
+if ($conn->connect_error) {
     die(json_encode([
-        "error"=>$conn->connect_error
+        "db_error" => $conn->connect_error
     ]));
 }
 
 $json = file_get_contents("php://input");
 
-if(!$json){
+if (!$json) {
     die(json_encode([
-        "error"=>"No llego JSON"
+        "error" => "No llegó JSON"
     ]));
 }
 
-$data = json_decode($json,true);
+$data = json_decode($json, true);
 
-if(!$data){
+if (!$data) {
     die(json_encode([
-        "error"=>"JSON invalido"
+        "error" => "JSON inválido"
     ]));
 }
 
-/* ============================================
-   ESCLAVO 1
-============================================ */
-if(isset($data["humo"])){
+/* ===============================
+   SALA SERVIDORES
+=============================== */
+if (isset($data["humo"])) {
 
     $sql = "INSERT INTO sala_servidores
-    (temperatura,humedad,nivel_humo,humo_digital,puerta_abierta)
+    (
+        temperatura,
+        humedad,
+        nivel_humo,
+        humo_digital
+    )
     VALUES
     (
         {$data['temperatura']},
         {$data['humedad']},
         {$data['humo']},
-        {$data['delta']},
-        {$data['puerta']}
+        {$data['delta']}
     )";
 }
 
-/* ============================================
-   ESCLAVO 2
-============================================ */
-elseif(isset($data["zona"])){
+/* ===============================
+   UPS
+=============================== */
+elseif (isset($data["zona"])) {
 
     $sql = "INSERT INTO sala_ups_redes
-    (temperatura,humedad,nivel_agua,hay_agua,es_intruso,puerta_abierta,ups_activo)
+    (
+        temperatura,
+        humedad,
+        nivel_agua,
+        hay_agua,
+        es_intruso,
+        puerta_abierta,
+        ups_activo
+    )
     VALUES
     (
         {$data['t']},
@@ -72,10 +82,10 @@ elseif(isset($data["zona"])){
     )";
 }
 
-/* ============================================
-   ESCLAVO 3
-============================================ */
-elseif(isset($data["voltaje"])){
+/* ===============================
+   JARDIN
+=============================== */
+elseif (isset($data["voltaje"])) {
 
     $vehiculo = ($data["distancia"] < 10) ? 1 : 0;
 
@@ -101,19 +111,24 @@ elseif(isset($data["voltaje"])){
     )";
 }
 
-else{
+else {
     die(json_encode([
-        "error"=>"Tipo desconocido"
+        "error" => "Tipo desconocido"
     ]));
 }
 
-if($conn->query($sql)){
+if ($conn->query($sql)) {
+
     echo json_encode([
-        "ok"=>"Insertado"
+        "ok" => true,
+        "msg" => "Insertado"
     ]);
-}else{
+
+} else {
+
     echo json_encode([
-        "sql_error"=>$conn->error
+        "sql_error" => $conn->error,
+        "query" => $sql
     ]);
 }
 
