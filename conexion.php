@@ -4,61 +4,70 @@ header("Content-Type: application/json");
 error_reporting(E_ALL);
 ini_set('display_errors', 1);
 
-$conn = new mysqli(
-    "kodama.proxy.rlwy.net",
-    "root",
-    "rMGJpYmLLwhgEXBqTklSGmrZPylNfLJO",
-    "datacenter_umg",
-    58999
-);
+/* ===============================
+   CONEXION PDO RAILWAY
+=============================== */
 
-if ($conn->connect_error) {
+try {
+
+    $conn = new PDO(
+        "mysql:host=kodama.proxy.rlwy.net;port=58999;dbname=datacenter_umg;charset=utf8mb4",
+        "root",
+        "rMGJpYmLLwhgEXBqTklSGmrZPylNfLJO"
+    );
+
+    $conn->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+
+} catch(PDOException $e){
+
     die(json_encode([
-        "db_error" => $conn->connect_error
+        "db_error"=>$e->getMessage()
     ]));
 }
 
 $json = file_get_contents("php://input");
 
-if (!$json) {
+if(!$json){
     die(json_encode([
-        "error" => "No llegó JSON"
+        "error"=>"No llegó JSON"
     ]));
 }
 
-$data = json_decode($json, true);
+$data = json_decode($json,true);
 
-if (!$data) {
+if(!$data){
     die(json_encode([
-        "error" => "JSON inválido"
+        "error"=>"JSON inválido"
     ]));
 }
 
 /* ===============================
-   SALA SERVIDORES
+   ESCLAVO 1
 =============================== */
-if (isset($data["humo"])) {
+if(isset($data["humo"])){
 
     $sql = "INSERT INTO sala_servidores
-    (
-        temperatura,
-        humedad,
-        nivel_humo,
-        humo_digital
-    )
-    VALUES
-    (
-        {$data['temperatura']},
-        {$data['humedad']},
-        {$data['humo']},
-        {$data['delta']}
-    )";
+    (temperatura,humedad,nivel_humo,humo_digital)
+    VALUES (?,?,?,?)";
+
+    $stmt = $conn->prepare($sql);
+
+    $stmt->execute([
+        $data["temperatura"],
+        $data["humedad"],
+        $data["humo"],
+        $data["delta"]
+    ]);
+
+    echo json_encode([
+        "ok"=>"Servidor guardado"
+    ]);
 }
 
 /* ===============================
-   UPS
+   ESCLAVO 2
 =============================== */
-elseif (isset($data["zona"])) {
+elseif(isset($data["zona"])){
 
     $sql = "INSERT INTO sala_ups_redes
     (
@@ -70,22 +79,29 @@ elseif (isset($data["zona"])) {
         puerta_abierta,
         ups_activo
     )
-    VALUES
-    (
-        {$data['t']},
-        {$data['h']},
-        {$data['agua_raw']},
-        {$data['agua']},
-        {$data['intruso']},
-        {$data['puerta']},
-        {$data['ahorro']}
-    )";
+    VALUES (?,?,?,?,?,?,?)";
+
+    $stmt = $conn->prepare($sql);
+
+    $stmt->execute([
+        $data["t"],
+        $data["h"],
+        $data["agua_raw"],
+        $data["agua"],
+        $data["intruso"],
+        $data["puerta"],
+        $data["ahorro"]
+    ]);
+
+    echo json_encode([
+        "ok"=>"UPS guardado"
+    ]);
 }
 
 /* ===============================
-   JARDIN
+   ESCLAVO 3
 =============================== */
-elseif (isset($data["voltaje"])) {
+elseif(isset($data["voltaje"])){
 
     $vehiculo = ($data["distancia"] < 10) ? 1 : 0;
 
@@ -99,39 +115,30 @@ elseif (isset($data["voltaje"])) {
         bomba_riego,
         talanquera_abierta
     )
-    VALUES
-    (
-        {$data['humedad_suelo']},
-        {$data['lluvia']},
-        {$data['pir']},
-        {$data['distancia']},
+    VALUES (?,?,?,?,?,?,?)";
+
+    $stmt = $conn->prepare($sql);
+
+    $stmt->execute([
+        $data["humedad_suelo"],
+        $data["lluvia"],
+        $data["pir"],
+        $data["distancia"],
         $vehiculo,
-        {$data['bomba']},
-        {$data['led']}
-    )";
-}
-
-else {
-    die(json_encode([
-        "error" => "Tipo desconocido"
-    ]));
-}
-
-if ($conn->query($sql)) {
-
-    echo json_encode([
-        "ok" => true,
-        "msg" => "Insertado"
+        $data["bomba"],
+        $data["led"]
     ]);
 
-} else {
-
     echo json_encode([
-        "sql_error" => $conn->error,
-        "query" => $sql
+        "ok"=>"Jardin guardado"
     ]);
 }
 
-$conn->close();
+else{
+
+    echo json_encode([
+        "error"=>"Tipo desconocido"
+    ]);
+}
 
 ?>
